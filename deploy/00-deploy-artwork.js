@@ -7,8 +7,8 @@ const { verify } = require("../utils/verify");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy, log } = deployments;
-  const deployer =
-    "090af5a19a13feed3c16093d93f00ba0e8eb5cb9484f26d0bc8749f1d0602bd8";
+  const deployer ="your private key"
+    ;
   log("----------------------------------------------------");
   log("Deploying FundMe and waiting for confirmations...");
   const arguments = ["Eternal", "EG"];

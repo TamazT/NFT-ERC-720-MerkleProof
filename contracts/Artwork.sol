@@ -1,29 +1,32 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity 0.8.7;
+pragma solidity ^0.8;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract Artwork is ERC721 {
     using Strings for uint256;
 
-    uint256 public tokenCounter = 1;
-    uint256 totalsupply = 3333;
-    uint256 maxPerWlAddress;
-    uint256 AllowlistPrice = 9 wei;
-    uint256 PublicPrice = 15 wei;
+    uint256 public tokenCounter;
+    uint256 constant totalsupply = 3333;
+    uint256 maxPerAddress; // переименовал, тк переменная используется не только для WL
+    uint256 private AllowlistPrice = 9 wei; // может для этих переменных сделать функцию?
+    uint256 private PublicPrice = 15 wei; // может для этих переменных сделать функцию?
 
-    bool mintWlOpen = false;
-    bool mintAllowlistOpen = false;
-    bool mintPublicOpen = false;
+    bytes32 private MerkleRootWL; //поменял на приватный
+    bytes32 private MerkleRootAllowlist;
 
-    address owner;
+    bool private mintWlOpen = false; // точно ли эти переменные делать приватными???
+    bool private mintAllowlistOpen = false; // точно ли эти переменные делать приватными???
+    bool private mintPublicOpen = false; // точно ли эти переменные делать приватными???
+
+    address public owner;
     string baseURI;
 
-    //all mappings
+    //удалил маппинги, которые ненужны из-за merkle root
     mapping(uint256 => string) private _tokenURIs;
-    mapping(address => bool) inWlAddresses;
-    mapping(address => bool) inAllowlistAddresses;
     mapping(address => uint256) AddressesMinted;
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this fucntion");
         _;
@@ -34,32 +37,26 @@ contract Artwork is ERC721 {
         owner = msg.sender;
     }
 
-    function look() public view returns (uint256) {
-        return AddressesMinted[msg.sender];
+    function changeAllPrice(uint256 _price) public onlyOwner {
+        AllowlistPrice = _price;
     }
 
-    //Fucntion to add wll adresses who alligbl to mint Fre
-    function addWlAdresses(address[] memory _wl) public onlyOwner {
-        address a;
-        for (uint256 i; i < _wl.length; i++) {
-            a = _wl[i];
-            inWlAddresses[a] = true;
-        }
+    function changePublicPrice(uint256 _price) public onlyOwner {
+        PublicPrice = _price;
     }
 
-    function addAllowlistAdresses(address[] memory _wl) public onlyOwner {
-        address a;
-        for (uint256 i; i < _wl.length; i++) {
-            a = _wl[i];
-            inAllowlistAddresses[a] = true;
-        }
+    function addMerkleRootWL(bytes32 _MerkleRoot) public onlyOwner {
+        MerkleRootWL = _MerkleRoot;
     }
 
-    function setMaxPerWLAddress(uint256 _c) public onlyOwner {
-        maxPerWlAddress = _c;
+    function addMerkleRootAllowlist(bytes32 _MerkleRoot) public onlyOwner {
+        MerkleRootAllowlist = _MerkleRoot;
     }
 
-    //chech and open phases of mint
+    function setmaxPerAddress(uint256 _maxPerAddress) public onlyOwner {
+        maxPerAddress = _maxPerAddress;
+    }
+
     function checkWlMint() public view returns (bool) {
         return mintWlOpen;
     }
@@ -96,17 +93,22 @@ contract Artwork is ERC721 {
         }
     }
 
-    //Minting fucntion for different phases
-    function mintWl(uint256 _amount) public {
-        require(mintWlOpen == true, "Wl mint didnot open");
-        require(inWlAddresses[msg.sender] == true, "You are not in wl list");
+    //Minting functions for different phases
+    function mintWl(bytes32[] calldata _merkleProof, uint256 _amount) public {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
-            tokenCounter + _amount < totalsupply,
+            MerkleProof.verify(_merkleProof, MerkleRootWL, leaf),
+            "You are not in whitelist"
+        );
+
+        require(mintWlOpen == true, "Wl mint didn't open");
+        require(
+            tokenCounter + _amount <= totalsupply,
             "You reached maxtotal supply"
         );
         require(
-            AddressesMinted[msg.sender] + _amount <= maxPerWlAddress,
-            "You have minted max per you address"
+            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
+            "You have minted max per your address"
         );
 
         for (uint256 i; i < _amount; i++) {
@@ -116,11 +118,20 @@ contract Artwork is ERC721 {
         }
     }
 
-    function mintAllowlist(uint256 _amount) public payable {
+    // я так понимаю, тут тоже должна быть тоже проверка на merkle root?
+    function mintAllowlist(bytes32[] calldata _merkleProof, uint256 _amount)
+        public
+        payable
+    {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(
+            MerkleProof.verify(_merkleProof, MerkleRootAllowlist, leaf),
+            "You are not in Allowlist"
+        );
         require(msg.value >= AllowlistPrice * _amount, "Not enough ETH");
         require(mintAllowlistOpen == true, "Allowlist mint did not open");
         require(
-            AddressesMinted[msg.sender] + _amount <= maxPerWlAddress,
+            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
             "You have minted max per you address"
         );
         require(
@@ -136,9 +147,9 @@ contract Artwork is ERC721 {
 
     function mintPublic(uint256 _amount) public payable {
         require(msg.value >= PublicPrice * _amount, "Not enough ETH");
-        require(mintPublicOpen == true, "Public mint did not open");
+        require(mintPublicOpen == true, "Public mint didn't open");
         require(
-            AddressesMinted[msg.sender] + _amount <= maxPerWlAddress,
+            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
             "You have minted max per you address"
         );
         require(
@@ -180,6 +191,23 @@ contract Artwork is ERC721 {
         payable(msg.sender).transfer(address(this).balance);
     }
 
+    function changeOwner(address _owner) public onlyOwner {
+        owner = _owner;
+    }
+
+    function checkOwner() public view returns (address) {
+        return owner;
+    }
+
+    function burn(uint256 _tokenid) public onlyOwner {
+        _burn(_tokenid);
+    }
+
+    // fallback, нам разве нужна? по сути, нам вроде только эфиры нужно принимать. Не помню, говори ли мы о ней.
+    fallback() external payable {}
+
+    receive() external payable {}
+
     function TresuareMint(uint256 _amount) public onlyOwner {
         for (uint256 i; i < _amount; i++) {
             _safeMint(owner, tokenCounter);
@@ -187,6 +215,3 @@ contract Artwork is ERC721 {
         }
     }
 }
-
-
-

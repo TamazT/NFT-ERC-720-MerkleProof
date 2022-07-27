@@ -9,21 +9,21 @@ contract Artwork is ERC721 {
 
     uint256 public tokenCounter;
     uint256 constant totalsupply = 3333;
-    uint256 maxPerAddress; // переименовал, тк переменная используется не только для WL
-    uint256 private AllowlistPrice = 9 wei; // может для этих переменных сделать функцию?
-    uint256 private PublicPrice = 15 wei; // может для этих переменных сделать функцию?
+    uint256 maxPerAddress; 
+    uint256 private AllowlistPrice = 9 wei;
+    uint256 private PublicPrice = 15 wei;
 
-    bytes32 private MerkleRootWL; //поменял на приватный
+    bytes32 private MerkleRootWL; 
     bytes32 private MerkleRootAllowlist;
 
-    bool private mintWlOpen = false; // точно ли эти переменные делать приватными???
-    bool private mintAllowlistOpen = false; // точно ли эти переменные делать приватными???
-    bool private mintPublicOpen = false; // точно ли эти переменные делать приватными???
+    bool private mintWlOpen = false; 
+    bool private mintAllowlistOpen = false; 
+    bool private mintPublicOpen = false; 
 
     address public owner;
     string baseURI;
 
-    //удалил маппинги, которые ненужны из-за merkle root
+    
     mapping(uint256 => string) private _tokenURIs;
     mapping(address => uint256) AddressesMinted;
 
@@ -93,7 +93,7 @@ contract Artwork is ERC721 {
         }
     }
 
-    //Minting functions for different phases
+   
     function mintWl(bytes32[] calldata _merkleProof, uint256 _amount) public {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
@@ -118,7 +118,7 @@ contract Artwork is ERC721 {
         }
     }
 
-    // я так понимаю, тут тоже должна быть тоже проверка на merkle root?
+   
     function mintAllowlist(bytes32[] calldata _merkleProof, uint256 _amount)
         public
         payable
@@ -203,7 +203,7 @@ contract Artwork is ERC721 {
         _burn(_tokenid);
     }
 
-    // fallback, нам разве нужна? по сути, нам вроде только эфиры нужно принимать. Не помню, говори ли мы о ней.
+    
     fallback() external payable {}
 
     receive() external payable {}

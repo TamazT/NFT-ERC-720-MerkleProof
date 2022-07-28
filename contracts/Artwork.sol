@@ -209,6 +209,10 @@ contract Artwork is ERC721 {
     receive() external payable {}
 
     function TresuareMint(uint256 _amount) public onlyOwner {
+    require(
+            tokenCounter + _amount < totalsupply,
+            "You reached maxtotal supply"
+        );
         for (uint256 i; i < _amount; i++) {
             _safeMint(owner, tokenCounter);
             tokenCounter++;

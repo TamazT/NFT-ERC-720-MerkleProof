@@ -8,24 +8,27 @@ contract Artwork is ERC721 {
     using Strings for uint256;
 
     uint256 public tokenCounter;
+    uint256 private MaxtoWL;
+    uint256 private MaxtoAllowlist;
     uint256 constant totalsupply = 3333;
-    uint256 maxPerAddress; 
+    uint256 maxPerAddress;
     uint256 private AllowlistPrice = 9 wei;
     uint256 private PublicPrice = 15 wei;
 
-    bytes32 private MerkleRootWL; 
+    bytes32 private MerkleRootWL;
     bytes32 private MerkleRootAllowlist;
 
-    bool private mintWlOpen = false; 
-    bool private mintAllowlistOpen = false; 
-    bool private mintPublicOpen = false; 
+    bool private mintWlOpen = false;
+    bool private mintAllowlistOpen = false;
+    bool private mintPublicOpen = false;
 
     address public owner;
     string baseURI;
 
-    
     mapping(uint256 => string) private _tokenURIs;
-    mapping(address => uint256) AddressesMinted;
+    mapping(address => uint256) private AddressesAllowlistMinted;
+    mapping(address => uint256) private AddressesPublictMinted;
+    mapping(address => bool) private AddressWlMint;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this fucntion");
@@ -93,32 +96,27 @@ contract Artwork is ERC721 {
         }
     }
 
-   
-    function mintWl(bytes32[] calldata _merkleProof, uint256 _amount) public {
+    //Minting functions for different phases
+    function mintWl(bytes32[] calldata _merkleProof) public {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
             MerkleProof.verify(_merkleProof, MerkleRootWL, leaf),
             "You are not in whitelist"
         );
 
-        require(mintWlOpen == true, "Wl mint didn't open");
+        require(mintWlOpen == true, "Wl mint is close");
+        require(MaxtoWL < 1000, "Wl size was reached");
         require(
-            tokenCounter + _amount <= totalsupply,
-            "You reached maxtotal supply"
+            AddressWlMint[msg.sender] == false,
+            "You have already minted your wl spot"
         );
-        require(
-            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
-            "You have minted max per your address"
-        );
-
-        for (uint256 i; i < _amount; i++) {
-            _safeMint(msg.sender, tokenCounter);
-            tokenCounter++;
-            AddressesMinted[msg.sender] += 1;
-        }
+        require(tokenCounter < totalsupply, "You have reched max total supply");
+        _safeMint(msg.sender, tokenCounter);
+        tokenCounter++;
+        AddressWlMint[msg.sender] = true;
+        MaxtoWL++;
     }
 
-   
     function mintAllowlist(bytes32[] calldata _merkleProof, uint256 _amount)
         public
         payable
@@ -129,19 +127,21 @@ contract Artwork is ERC721 {
             "You are not in Allowlist"
         );
         require(msg.value >= AllowlistPrice * _amount, "Not enough ETH");
-        require(mintAllowlistOpen == true, "Allowlist mint did not open");
+        require(mintAllowlistOpen == true, "Allowlist mint is close");
         require(
-            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
+            AddressesAllowlistMinted[msg.sender] + _amount < 2,
             "You have minted max per you address"
         );
+        require(MaxtoAllowlist + _amount < 1000, "Allwolist size was reached");
         require(
-            tokenCounter + _amount <= totalsupply,
-            "You reached maxtotal supply"
+            MaxtoAllowlist + _amount < totalsupply,
+            "You have reched max total supply"
         );
         for (uint256 i; i < _amount; i++) {
             _safeMint(msg.sender, tokenCounter);
             tokenCounter++;
-            AddressesMinted[msg.sender] += 1;
+            AddressesAllowlistMinted[msg.sender] += 1;
+            MaxtoAllowlist++;
         }
     }
 
@@ -149,17 +149,17 @@ contract Artwork is ERC721 {
         require(msg.value >= PublicPrice * _amount, "Not enough ETH");
         require(mintPublicOpen == true, "Public mint didn't open");
         require(
-            AddressesMinted[msg.sender] + _amount <= maxPerAddress,
+            AddressesPublictMinted[msg.sender] + _amount < 2,
             "You have minted max per you address"
         );
         require(
-            tokenCounter + _amount <= totalsupply,
+            tokenCounter + _amount < totalsupply,
             "You reached maxtotal supply"
         );
         for (uint256 i; i < _amount; i++) {
             _safeMint(msg.sender, tokenCounter);
             tokenCounter++;
-            AddressesMinted[msg.sender] += 1;
+            AddressesPublictMinted[msg.sender] += 1;
         }
     }
 
@@ -203,7 +203,7 @@ contract Artwork is ERC721 {
         _burn(_tokenid);
     }
 
-    
+    // fallback, нам разве нужна? по сути, нам вроде только эфиры нужно принимать. Не помню, говори ли мы о ней.
     fallback() external payable {}
 
     receive() external payable {}
